@@ -1,5 +1,5 @@
 ---
-title: "2.1 Model BIC and Plot"
+title: "2. Model Evaluation and Plot"
 output: html_document
 date: "2026-01-14"
 ---
