@@ -8,8 +8,8 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Prerequisite - Load Previous Environemnt
-```{r, eval = FALSE}
+## Prerequisite - Load Previous Environment
+```{r}
 load("environment.RData")
 ```
 
@@ -449,7 +449,7 @@ if (identical(B_3_model, M7) || identical(B_3_model, M6)) {
 
 
 ## Save Environment
-```{r, eval = FALSE}
+```{r}
 save.image(file = "environment.RData")
 ```
 
