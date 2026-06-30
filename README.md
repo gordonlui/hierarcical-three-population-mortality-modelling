@@ -126,6 +126,7 @@ PV^{(i)} =
 \quad i = 1,\ldots,5000.
 ```
 
+The weights w1 and w2 represent the hedge weights of the two index-based longevity swaps, which are calibrated to minimise the 99.5% Value-at-Risk (VaR), minus the mean, of the present value of the hedged portfolio under the distribution generated from the 5,000 simulations.
 ---
 
 ## Data
@@ -147,15 +148,28 @@ PV^{(i)} =
 
 ---
 
-## Packages
+## Required Packages
 
-Typical R dependencies include:
+The following R packages are required to run this project:
 
-- `demography`
-- `StMoMo`
-- `forecast`
-- `dplyr`
-- `tidyr`
+```r
+install.packages(c(
+  "StMoMo",
+  "demography",
+  "stats",
+  "forecast",
+  "vars",
+  "MASS"
+))
+```
+
+### Overview
+- **StMoMo**: Stochastic mortality modelling (CBD framework implementation)  
+- **demography**: Access and manipulation of mortality data (HMD integration)  
+- **stats**: Base statistical functions for modelling and estimation  
+- **forecast**: Time-series forecasting of model parameters  
+- **vars**: Vector autoregressive (VAR) modelling for multi-population dynamics  
+- **MASS**: Additional statistical tools used in estimation and simulation  
 
 ---
 
@@ -164,8 +178,7 @@ Typical R dependencies include:
 - Fitted mortality models
 - Forecasted mortality rates
 - Bootstrap distributions of parameters
-- Hedging performance metrics
-- Risk reduction estimates
+- Longevity Risk reduction estimates
 
 ---
 
