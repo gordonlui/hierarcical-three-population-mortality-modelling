@@ -1,0 +1,461 @@
+4 - Bootstrapping and Simulation
+================
+Yiu Chung Lui (Gordon)
+
+## Prerequisite - Load Previous Environemnt
+
+``` r
+load("environment.RData")
+```
+
+## 4.1 - Residual Bootstrapping
+
+The residual bootstrap method resamples deviance residuals from the
+three-population mortality model with replacement to generate bootstrap
+samples. These are converted into death counts under the Binomial
+assumption, and the model is refitted for each replication (B = 5000).
+The resulting parameter estimates are then projected using the specified
+time-series models to produce bootstrap forecasts of mortality rates for
+each population. This procedure takes approximately 55 minutes to run .
+
+### Load packages
+
+``` r
+library(StMoMo)
+library(demography)
+library(stats)
+library(forecast)
+library(vars)
+library(MASS)
+```
+
+### Function for simulating VAR(1) model (“VAR1_sim”)
+
+``` r
+VAR1_sim <- function(fit, nsim, seed) {
+  set.seed(seed)
+  
+  # Extract VAR(1) info
+  d <- length(fit$varresult)
+  B <- Bcoef(fit)
+  Sigma <- summary(fit)$covres
+  
+  # Intercepts
+  c_vec <- B[, "const"]
+  
+  # Lag-1 coefficient matrix
+  series_names <- colnames(fit$y)
+  A <- B[, paste0(series_names, ".l1")]
+  
+  # Last observed Y
+  Y_T <- as.numeric(tail(fit$y, 1))
+  
+  # Storage: h steps × d variables
+  sims <- matrix(NA_real_, nrow = d, ncol = nsim,
+                 dimnames = list(series_names, year_forecast))
+  
+  curr <- Y_T
+  for(t in 1:h){
+    eps <- mvrnorm(1, mu = rep(0, d), Sigma = Sigma)  # one shock
+    curr <- c_vec + A %*% curr + eps                  # recursion
+    sims[, t] <- curr
+  }
+  
+  return(sims)
+}
+```
+
+### Perform Residual Bootstrapping on Fitted Model (Takes approx 55min for nBoot = 5000)
+
+``` r
+# Number of Bootstrap
+nBoot <- 5000
+
+set.seed(1)
+
+start_time <- Sys.time()
+
+# Bootstrap on fitted models
+R1_boot <- bootstrap(R1_fit, nBoot = nBoot, type = "residual")
+R2_boot <- bootstrap(R2_fit, nBoot = nBoot, type = "residual")
+B_3_boot <- bootstrap(B_3_fit, nBoot = nBoot, type = "residual")
+
+end_time <- Sys.time()
+time_taken <- end_time - start_time
+print(time_taken)
+```
+
+### Perform Simulations on Parameters (Takes approx 2.5min for nBoot = 5000)
+
+``` r
+start_time <- Sys.time()
+
+# Store simulated parameters for each bootstrap
+
+# R1
+sim_kt_R1_fit <- vector("list", nBoot)
+kt_R1_boot_sim <- vector("list", nBoot)
+if (identical(R1_model, M7) || identical(R1_model, M6)) {
+  sim_gc_R1_fit <- vector("list", nBoot)
+  gc_R1_boot_sim <- vector("list", nBoot)
+}
+
+# R2
+sim_kt_R2_fit <- vector("list", nBoot)
+kt_R2_boot_sim <- vector("list", nBoot)
+if (identical(R2_model, M7) || identical(R2_model, M6)) {
+  sim_gc_R2_fit <- vector("list", nBoot)
+  gc_R2_boot_sim <- vector("list", nBoot)
+}
+
+# B_3
+sim_kt_B_3_fit <- vector("list", nBoot)
+kt_B_3_boot_sim <- vector("list", nBoot)
+if (identical(B_3_model, M7) || identical(B_3_model, M6)) {
+  sim_gc_B_3_fit <- vector("list", nBoot)
+  gc_B_3_boot_sim <- vector("list", nBoot)
+}
+
+for (i in 1:nBoot) {
+  # Obtain bootstrapped parameters
+  
+  # R1_boot Population
+  if (identical(R1_model, M7)) {
+    # M7
+    kt1_R1_boot <- R1_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R1_boot <- R1_boot$bootParameters[[i]]$kt[2, ]
+    kt3_R1_boot <- R1_boot$bootParameters[[i]]$kt[3, ]
+    kt_R1_boot <- rbind(kt1_R1_boot, kt2_R1_boot, kt3_R1_boot)
+
+    gc_R1_boot <- R1_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(R1_model, M6)) {
+    # M6
+    kt1_R1_boot <- R1_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R1_boot <- R1_boot$bootParameters[[i]]$kt[2, ]
+    kt_R1_boot <- rbind(kt1_R1_boot, kt2_R1_boot)
+
+    gc_R1_boot <- R1_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(R1_model, M5)) {
+    # M5
+    kt1_R1_boot <- R1_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R1_boot <- R1_boot$bootParameters[[i]]$kt[2, ]
+    kt_R1_boot <- rbind(kt1_R1_boot, kt2_R1_boot)
+  
+  } else {
+    stop("R1 Model specification not included/correct")
+  }
+
+  # R2_boot Population
+  if (identical(R2_model, M7)) {
+    # M7
+    kt1_R2_boot <- R2_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R2_boot <- R2_boot$bootParameters[[i]]$kt[2, ]
+    kt3_R2_boot <- R2_boot$bootParameters[[i]]$kt[3, ]
+    kt_R2_boot <- cbind(kt1_R2_boot, kt2_R2_boot, kt3_R2_boot) # need cbind under VAR package
+
+    gc_R2_boot <- R2_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(R2_model, M6)) {
+    # M6
+    kt1_R2_boot <- R2_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R2_boot <- R2_boot$bootParameters[[i]]$kt[2, ]
+    kt_R2_boot <- cbind(kt1_R2_boot, kt2_R2_boot) # need cbind under VAR package
+
+    gc_R2_boot <- R2_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(R2_model, M5)) {
+    # M5
+    kt1_R2_boot <- R2_boot$bootParameters[[i]]$kt[1, ]
+    kt2_R2_boot <- R2_boot$bootParameters[[i]]$kt[2, ]
+    kt_R2_boot <- cbind(kt1_R2_boot, kt2_R2_boot) # need cbind under VAR package
+  
+  } else {
+    stop("R2 Model specification not included/correct")
+  }
+
+  # B_3_boot Population
+  if (identical(B_3_model, M7)) {
+    # M7
+    kt1_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[1, ]
+    kt2_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[2, ]
+    kt3_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[3, ]
+    kt_B_3_boot <- cbind(kt1_B_3_boot, kt2_B_3_boot, kt3_B_3_boot) # need cbind under VAR package
+
+    gc_B_3_boot <- B_3_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(B_3_model, M6)) {
+    # M6
+    kt1_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[1, ]
+    kt2_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[2, ]
+    kt_B_3_boot <- cbind(kt1_B_3_boot, kt2_B_3_boot) # need cbind under VAR package
+
+    gc_B_3_boot <- B_3_boot$bootParameters[[i]]$gc
+  
+  } else if (identical(B_3_model, M5)) {
+    # M5
+    kt1_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[1, ]
+    kt2_B_3_boot <- B_3_boot$bootParameters[[i]]$kt[2, ]
+    kt_B_3_boot <- cbind(kt1_B_3_boot, kt2_B_3_boot) # need cbind under VAR package
+  
+  } else {
+    stop("B_3 Model specification not included/correct")
+  }
+  
+  # Store fitted values to combine later
+  
+  # R1
+  if (identical(R1_model, M7)) {
+    # M7
+    sim_kt_R1_fit[[i]] <- rbind(kt1_R1_boot, kt2_R1_boot, kt3_R1_boot)
+    sim_gc_R1_fit[[i]] <- rbind(gc_R1_boot)
+  
+  } else if (identical(R1_model, M6)) {
+    # M6
+    sim_kt_R1_fit[[i]] <- rbind(kt1_R1_boot, kt2_R1_boot)
+    sim_gc_R1_fit[[i]] <- rbind(gc_R1_boot)
+  
+  } else if (identical(B_3_model, M5)) {
+    # M5
+    sim_kt_R1_fit[[i]] <- rbind(kt1_R1_boot, kt2_R1_boot)
+  
+  } else {
+    stop("R1 Model specification not included/correct")
+  }
+  
+  # R2
+  if (identical(R2_model, M7)) {
+    # M7
+    sim_kt_R2_fit[[i]] <- rbind(kt1_R2_boot, kt2_R2_boot, kt3_R2_boot)
+    sim_gc_R2_fit[[i]] <- rbind(gc_R2_boot)
+  
+  } else if (identical(R2_model, M6)) {
+    # M6
+    sim_kt_R2_fit[[i]] <- rbind(kt1_R2_boot, kt2_R2_boot)
+    sim_gc_R2_fit[[i]] <- rbind(gc_R2_boot)
+  
+  } else if (identical(B_3_model, M5)) {
+    # M5
+    sim_kt_R2_fit[[i]] <- rbind(kt1_R2_boot, kt2_R2_boot)
+  
+  } else {
+    stop("R2 Model specification not included/correct")
+  }
+  
+  # B_3
+  if (identical(B_3_model, M7)) {
+    # M7
+    sim_kt_B_3_fit[[i]] <- rbind(kt1_B_3_boot, kt2_B_3_boot, kt3_B_3_boot)
+    sim_gc_B_3_fit[[i]] <- rbind(gc_B_3_boot)
+  
+  } else if (identical(B_3_model, M6)) {
+    # M6
+    sim_kt_B_3_fit[[i]] <- rbind(kt1_B_3_boot, kt2_B_3_boot)
+    sim_gc_B_3_fit[[i]] <- rbind(gc_B_3_boot)
+  
+  } else if (identical(B_3_model, M5)) {
+    # M5
+    sim_kt_B_3_fit[[i]] <- rbind(kt1_B_3_boot, kt2_B_3_boot)
+  
+  } else {
+    stop("B_3 Model specification not included/correct")
+  }
+  
+################################################################################
+  
+  # Model Bootstrapped Parameters
+  
+  ### R1_boot Modelling
+
+  # MRWD fit on kt_R1_boot
+  kt_R1_fit_boot <- mrwd(kt_R1_boot)
+  
+  # ARIMA(1,1,0) on gc_R1_boot for M6 or M7 model
+  if (identical(R1_model, M7) || identical(R1_model, M6)){
+    gc_R1_fit_boot <- Arima(gc_R1_boot, order = c(1, 1, 0), include.constant = TRUE)
+  }
+
+  ### R2_boot Modelling
+
+  # VAR(1) fit on kt_R2_boot
+  kt_R2_fit_boot <- VAR(kt_R2_boot, p = 1)
+
+  # AR(1) on gc_R2_boot for M6 or M7 model
+  if (identical(R2_model, M7) || identical(R2_model, M6)){
+    gc_R2_fit_boot <- Arima(gc_R2_boot, order = c(1, 0, 0), include.constant = TRUE, method = "ML")
+  }
+
+  ### B_3_boot Modelling
+
+  # VAR(1) fit on kt_B_3_boot
+  kt_B_3_fit_boot <- VAR(kt_B_3_boot, p = 1)
+  
+  # AR(1) on gc_B_3_boot for M6 or M7 model
+  if (identical(B_3_model, M7) || identical(B_3_model, M6)){
+    gc_B_3_fit_boot <- Arima(gc_B_3_boot, order = c(1, 0, 0), include.constant = TRUE, method = "ML")
+  }
+  
+################################################################################
+  
+  # Simulate Bootstrapped Parameters Model
+  
+  # R1_boot Simulation
+  
+  # MRWD simulation on kt_R1_boot
+  kt_R1_boot_sim.d <- simulate(kt_R1_fit_boot, nsim = h, seed = 1)
+  
+  # ARIMA(1,1,0) simulation on gc_R1_boot for M6 or M7 model
+  if (identical(R1_model, M7) || identical(R1_model, M6)){
+      sim_gc_R1 <- as.numeric(simulate(gc_R1_fit_boot, nsim = h, seed = 1))
+      gc_R1_boot_sim.d <- matrix(sim_gc_R1, nrow = 1, ncol = h,
+                                 dimnames = list(paste0("gc"), cohort_forecast))
+  }
+  
+  # R2_boot Simulation
+  
+  # VAR(1) simulation on kt_R2_boot
+  kt_R2_boot_sim.d <- VAR1_sim(kt_R2_fit_boot, nsim = h, seed = 1)
+  
+  # AR(1) simulation on gc_R2_boot for M6 or M7 model
+  if (identical(R2_model, M7) || identical(R2_model, M6)){
+    sim_gc_R2 <- as.numeric(simulate(gc_R2_fit_boot, nsim = h, seed = 1))
+    gc_R2_boot_sim.d <- matrix(sim_gc_R2, nrow = 1, ncol = h,
+                               dimnames = list(paste0("gc"), cohort_forecast))
+  }
+  
+  # B_3_boot Simulation
+  
+  # VAR(1) simulation on kt_B_3_boot
+  kt_B_3_boot_sim.d <- VAR1_sim(kt_B_3_fit_boot, nsim = h, seed = 1)
+  
+  # AR(1) simulation on gc_B_3_boot for M6 or M7 model
+  if (identical(B_3_model, M7) || identical(B_3_model, M6)){
+    sim_gc_B_3 <- as.numeric(simulate(gc_B_3_fit_boot, nsim = h, seed = 1))
+    gc_B_3_boot_sim.d <- matrix(sim_gc_B_3, nrow = 1, ncol = h,
+                               dimnames = list(paste0("gc"), cohort_forecast))
+  }
+  
+  ### Store results
+  
+  # R1
+  kt_R1_boot_sim[[i]] <- kt_R1_boot_sim.d
+  if (identical(R1_model, M7) || identical(R1_model, M6)) {
+    gc_R1_boot_sim[[i]] <- gc_R1_boot_sim.d
+  }
+
+  # R2
+  kt_R2_boot_sim[[i]] <- kt_R2_boot_sim.d
+  if (identical(R2_model, M7) || identical(R2_model, M6)) {
+    gc_R2_boot_sim[[i]] <- gc_R2_boot_sim.d
+  }
+
+  # B_3
+  kt_B_3_boot_sim[[i]] <- kt_B_3_boot_sim.d
+  if (identical(B_3_model, M7) || identical(B_3_model, M6)) {
+    gc_B_3_boot_sim[[i]] <- gc_B_3_boot_sim.d
+  }
+}
+
+end_time <- Sys.time()
+time_taken <- end_time - start_time
+print(time_taken)
+```
+
+## 4.2 - Project and store future mortality rates
+
+### Mean forecast
+
+``` r
+### R1
+
+# Combine kt fitted with forecast
+mean_kt_R1_combined <- cbind(kt_R1, mean_kt_R1_f)
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(R1_model, M7) || identical(R1_model, M6)) {
+  mean_gc_R1_combined <- cbind(rbind(gc_R1), mean_gc_R1_f)
+}
+
+################################################################################
+
+### R2
+
+# Combine kt fitted with forecast
+mean_kt_R2_combined <- cbind(t(kt_R2), mean_kt_R2_f)
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(R2_model, M7) || identical(R2_model, M6)) {
+  mean_gc_R2_combined <- cbind(rbind(gc_R2), mean_gc_R2_f)
+}
+
+################################################################################
+
+### B_3
+
+# Combine kt fitted with forecast
+mean_kt_B_3_combined <- cbind(t(kt_B_3), mean_kt_B_3_f)
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(B_3_model, M7) || identical(B_3_model, M6)) {
+  mean_gc_B_3_combined <- cbind(rbind(gc_B_3), mean_gc_B_3_f)
+}
+```
+
+### Simulated forecast
+
+``` r
+### R1
+
+# Combine kt fitted with forecast
+sim_kt_R1_combined <- vector("list", nBoot)
+for (i in 1:nBoot) {
+  sim_kt_R1_combined[[i]] <- cbind(sim_kt_R1_fit[[i]], kt_R1_boot_sim[[i]])
+}
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(R1_model, M7) || identical(R1_model, M6)) {
+  sim_gc_R1_combined <- vector("list", nBoot)
+  for (i in 1:nBoot) {
+    sim_gc_R1_combined[[i]] <- cbind(sim_gc_R1_fit[[i]], gc_R1_boot_sim[[i]])
+  }
+}
+
+### R2
+
+# Combine kt fitted with forecast
+sim_kt_R2_combined <- vector("list", nBoot)
+for (i in 1:nBoot) {
+  sim_kt_R2_combined[[i]] <- cbind(sim_kt_R2_fit[[i]], kt_R2_boot_sim[[i]])
+}
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(R2_model, M7) || identical(R2_model, M6)) {
+  sim_gc_R2_combined <- vector("list", nBoot)
+  for (i in 1:nBoot) {
+    sim_gc_R2_combined[[i]] <- cbind(sim_gc_R2_fit[[i]], gc_R2_boot_sim[[i]])
+  }
+}
+
+### B_3
+
+# Combine kt fitted with forecast
+sim_kt_B_3_combined <- vector("list", nBoot)
+for (i in 1:nBoot) {
+  sim_kt_B_3_combined[[i]] <- cbind(sim_kt_B_3_fit[[i]], kt_B_3_boot_sim[[i]])
+}
+
+# Combine gc fitted with forecast for M6 and M7 model
+if (identical(B_3_model, M7) || identical(B_3_model, M6)) {
+  sim_gc_B_3_combined <- vector("list", nBoot)
+  for (i in 1:nBoot) {
+    sim_gc_B_3_combined[[i]] <- cbind(sim_gc_B_3_fit[[i]], gc_B_3_boot_sim[[i]])
+  }
+}
+```
+
+## Save Environment
+
+``` r
+save.image(file = "environment.RData")
+```
