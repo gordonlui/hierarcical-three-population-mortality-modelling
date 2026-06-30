@@ -25,7 +25,7 @@ install.packages(c("StMoMo",
 To obtain the necessary datasets from HMD, we use the "demography" package, which requires a registered HMD account.
 
 ### Username and Password (insert HMD username and password here)
-```{r, eval = FALSE}
+```{r}
 username <- "" #Insert HMD account username
 password <- "" #Insert HMD account password
 ```
@@ -219,7 +219,7 @@ simulate_country_population <- function(country, size_relative_to_country_popula
 ```
 
 ### Simulating populations (England and Wales, Scotland, and Northern Ireland example)
-```{r, eval = FALSE}
+```{r}
 # Use simulate_country_population function to create dataset for simulated ENW, SCO, and NIR population
 sim_ENW_stmomo_i <- simulate_country_population("ENW", size_relative_to_country_population = 5, set_seed = 1)
 sim_SCO_stmomo_i <- simulate_country_population("SCO", size_relative_to_country_population = 3, set_seed = 1)
