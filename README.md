@@ -16,6 +16,52 @@ The hierarchical structure allows information sharing across populations, improv
 
 ---
 
+## Repository Structure
+
+The project is organised into a five-stage modelling pipeline implemented in R Markdown:
+
+### Core workflow
+
+- `1 - HMD Dataset.Rmd`  
+  Data extraction and preprocessing from the Human Mortality Database (HMD), including population selection and dataset construction.
+
+- `2 - Model Fitting and Plots.Rmd`  
+  Fitting of the hierarchical three-population mortality models (CBD family: M5–M7) and visualisation of fitted results.
+
+- `3 - Time Series Model and Forecast.Rmd`  
+  Time-series modelling of mortality parameters and generation of forecasted mortality rates.
+
+- `4 - Bootstrapping and Simulation.Rmd`  
+  Residual bootstrap procedure for uncertainty quantification and simulation of mortality trajectories.
+
+- `5 - Hedging.Rmd`  
+  Construction and evaluation of index-based longevity hedging strategies, including risk reduction metrics.
+
+---
+
+### Data
+
+- `HMD_Countries.csv`  
+  Mapping file for HMD country codes and labels used for dataset construction.
+
+---
+
+### Outputs
+
+Each R Markdown file generates a corresponding `.md` output file for GitHub rendering (e.g. `1---HMD-Dataset.md`), which documents results and methodology.
+
+---
+
+### Workflow summary
+
+1. HMD data extraction  
+2. Hierarchical mortality model estimation  
+3. Time-series forecasting  
+4. Bootstrap simulation  
+5. Longevity hedging evaluation
+
+---
+
 ## Mortality Models
 
 We consider the Cairns–Blake–Dowd (CBD) family of mortality models.
