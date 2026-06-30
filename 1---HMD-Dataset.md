@@ -1,0 +1,284 @@
+1 - HMD Dataset
+================
+Yiu Chung Lui (Gordon)
+
+## Prerequisite - Install Necessary Packages
+
+Install Packages (run if needed)
+
+``` r
+install.packages(c("StMoMo",
+                   "demography",
+                   "stats",
+                   "forecast",
+                   "vars",
+                   "MASS"))
+```
+
+## 1.1 - Obtain HMD dataset
+
+To obtain the necessary datasets from HMD, we use the “demography”
+package, which requires a registered HMD account.
+
+### Username and Password (insert HMD username and password here)
+
+``` r
+username <- "" #Insert HMD account username
+password <- "" #Insert HMD account password
+```
+
+### Load Packages
+
+``` r
+library(StMoMo)
+```
+
+    ## Loading required package: gnm
+
+    ## Loading required package: forecast
+
+    ## Registered S3 method overwritten by 'quantmod':
+    ##   method            from
+    ##   as.zoo.data.frame zoo
+
+``` r
+library(demography)
+```
+
+    ## Registered S3 methods overwritten by 'demography':
+    ##   method      from 
+    ##   print.lca   e1071
+    ##   summary.lca e1071
+
+    ## This is demography 2.0
+
+``` r
+library(stats)
+```
+
+### HMD Countries
+
+The HMD country codes and labels are organised using a CSV file. Users
+do not need to follow this exact approach, provided they supply the
+country codes in the same format. The labels are used only for display
+purposes and can be customised as desired.
+
+``` r
+HMD_Countries <- read.csv("HMD_Countries.csv")
+print(HMD_Countries$HMD_Country_Code)
+```
+
+    ##  [1] "AUS"     "AUT"     "BEL"     "BGR"     "CAN"     "CZE"     "DNK"    
+    ##  [8] "FIN"     "FRATNP"  "HUN"     "ISL"     "IRL"     "JPN"     "LTU"    
+    ## [15] "LUX"     "NLD"     "NZL_NP"  "NOR"     "POL"     "PRT"     "SVK"    
+    ## [22] "ESP"     "SWE"     "CHE"     "TWN"     "GBR_NP"  "GBRTENW" "GBR_SCO"
+    ## [29] "GBR_NIR" "USA"
+
+``` r
+print(HMD_Countries$Label)
+```
+
+    ##  [1] "AUS" "AUT" "BEL" "BGR" "CAN" "CZE" "DNK" "FIN" "FRA" "HUN" "ISL" "IRL"
+    ## [13] "JPN" "LTU" "LUX" "NLD" "NZL" "NOR" "POL" "PRT" "SVK" "ESP" "SWE" "CHE"
+    ## [25] "TWN" "UK"  "ENW" "SCO" "NIR" "USA"
+
+### Filter the dataset to the selected ages and years (use ages 60-90 and years 1970 - 2019 in this example)
+
+``` r
+year_range <- 1970:2019
+age_lower <- 60
+age_upper <- 90
+```
+
+### Create HMD Datasets
+
+``` r
+# Define countries and labels
+countries <- HMD_Countries$HMD_Country_Code
+labels <- HMD_Countries$Label
+
+# Loop and assign each dataset
+for (i in 1:length(countries)) {
+  # Obtain data from HMD
+  HMD_data <- hmd.mx(country = countries[i],
+                     username = username,
+                     password = password,
+                     label = labels[i])
+  
+  # Assign dataset name (e.g., UK_data, ENW_data)
+  assign(paste0(labels[i], "_data"), HMD_data)
+  
+  # Extract year range
+  HMD_sub <- extract.years(HMD_data, years = year_range)
+  
+  # Age filtering
+  age_filter <- which(HMD_sub$age >= age_lower & HMD_sub$age <= age_upper)
+  
+  HMD_sub$rate$male   <- HMD_sub$rate$male[age_filter, ]
+  HMD_sub$rate$female <- HMD_sub$rate$female[age_filter, ]
+  HMD_sub$rate$total  <- HMD_sub$rate$total[age_filter, ]
+  
+  HMD_sub$pop$male    <- HMD_sub$pop$male[age_filter, ]
+  HMD_sub$pop$female  <- HMD_sub$pop$female[age_filter, ]
+  HMD_sub$pop$total   <- HMD_sub$pop$total[age_filter, ]
+  
+  HMD_sub$age <- HMD_sub$age[age_filter]
+  
+  # Assign subset object (e.g., UK_sub, ENW_sub)
+  assign(paste0(labels[i], "_sub"), HMD_sub)
+  
+  # Convert into StMoMo Dataset (central exposures)
+  stmomo_c <- StMoMoData(HMD_sub, series = "total", type = "central")
+  assign(paste0(labels[i], "_stmomo_c"), stmomo_c)
+  
+  # Convert to initial exposures
+  stmomo_i <- central2initial(stmomo_c)
+  assign(paste0(labels[i], "_stmomo_i"), stmomo_i)
+}
+```
+
+### Combine all population datasets
+
+``` r
+# Loop over labels and return the corresponding datasets
+stmomo_datasets <- lapply(labels, function(lbl) {
+  get(paste0(lbl, "_stmomo_i"))
+})
+
+# Name the list by labels
+names(stmomo_datasets) <- labels
+```
+
+## 1.2 - Create Alternative populations
+
+In addition to directly obtaining population data from HMD, the
+following examples demonstrate how to construct additional datasets by
+combining death rates and exposure data from selected HMD populations.
+Methods such as simulating a population using a binomial model of deaths
+are also presented. These newly generated populations are then combined
+with the full HMD datasets obtained previously.
+
+### Function to combine population datasets (“combine_stmomo”)
+
+``` r
+combine_stmomo <- function(countries, label) {
+  # Obtain datasets with the specified countries
+  dataset_list <- stmomo_datasets[countries]
+  
+  # Extract ages and years (all datasets share the same structure)
+  ages <- dataset_list[[1]]$ages
+  years <- dataset_list[[1]]$years
+  
+  # Empty combined matrices
+  D_total <- matrix(0, nrow = length(ages), ncol = length(years),
+                    dimnames = list(ages, years))
+  E_total <- matrix(0, nrow = length(ages), ncol = length(years),
+                    dimnames = list(ages, years))
+  
+  # Loop through each dataset and align before summing
+  for (i in 1:length(dataset_list)) {
+    # Ensure identical indexing
+    ds_D <- dataset_list[[i]]$Dxt
+    ds_E <- dataset_list[[i]]$Ext
+    
+    D_total <- D_total + ds_D
+    E_total <- E_total + ds_E
+  }
+  
+  # Build combined object
+  stmomo_combined <- list(
+    ages = ages,
+    years = years,
+    Dxt = D_total,
+    Ext = E_total,
+    type = "initial",
+    series = "total",
+    label = label
+  )
+  
+  class(stmomo_combined) <- "StMoMoData"
+  return(stmomo_combined)
+}
+```
+
+### Combine populations (Europe example)
+
+``` r
+# List Europe countries (Must be in stmomo_dataset)
+Europe <- c("AUT", "BEL", "BGR", "CZE", "DNK", "FIN", "FRA", "HUN", "ISL", 
+            "IRL", "LTU", "LUX", "NLD", "NOR", "POL", "PRT", "SVK", "ESP", 
+            "SWE", "CHE", "UK")
+# Also group Europe by geographical locations
+Northern_Europe <- c("DNK","FIN","ISL","IRL","NOR","SWE","UK")
+Western_Europe <- c("AUT","BEL","FRA","LUX","NLD","CHE")
+Southern_Europe <- c("PRT","ESP")
+Eastern_Europe <- c("BGR","CZE","HUN","LTU","POL","SVK")
+
+# Use combine_stmomo function to create dataset for Europe Countries
+Europe_stmomo_i <- combine_stmomo(Europe, label = "Europe")
+Northern_Europe_stmomo_i <- combine_stmomo(Northern_Europe, label = "Northern_Europe")
+Western_Europe_stmomo_i <- combine_stmomo(Western_Europe, label = "Western_Europe")
+Southern_Europe_stmomo_i <- combine_stmomo(Southern_Europe, label = "Southern_Europe")
+Eastern_Europe_stmomo_i <- combine_stmomo(Eastern_Europe , label = "Eastern_Europe ")
+
+# Add Europe dataset to the existing list
+stmomo_datasets$Europe <- Europe_stmomo_i
+stmomo_datasets$Northern_Europe <- Northern_Europe_stmomo_i
+stmomo_datasets$Western_Europe <- Western_Europe_stmomo_i
+stmomo_datasets$Southern_Europe <- Southern_Europe_stmomo_i
+stmomo_datasets$Eastern_Europe <- Eastern_Europe_stmomo_i
+```
+
+### Function to simulate populations (“simulate_country_population”)
+
+``` r
+simulate_country_population <- function(country, size_relative_to_country_population, set_seed = 1) {
+  # Get country StMoMo dataset 
+  data <- stmomo_datasets[[country]]
+  data_qxt <- data$Dxt / data$Ext
+  
+  # Size of simulated population relative to the country population 
+  size <- size_relative_to_country_population
+  
+  # Simulating B population
+  Ext <- (data$Ext)/size
+  Dxt <- Ext
+  
+  set.seed(set_seed)
+  for (i in 1:(age_upper - age_lower + 1)) {
+    for (j in 1:length(year_range)) {
+      Dxt[i, j] <- rbinom(1, round(Ext[i, j], 0), data_qxt[i, j])
+    }
+  }
+  
+  # Form simulated population StMoMo Dataset
+  sim_stmomo_i <- data
+  sim_stmomo_i$label <- paste0("sim_", country)
+  sim_stmomo_i$Ext <- Ext
+  sim_stmomo_i$Dxt <- Dxt
+  
+  # Return StMoMo Dataset
+  return(sim_stmomo_i)
+}
+```
+
+### Simulating populations (England and Wales, Scotland, and Northern Ireland example)
+
+``` r
+# Use simulate_country_population function to create dataset for simulated ENW, SCO, and NIR population
+sim_ENW_stmomo_i <- simulate_country_population("ENW", size_relative_to_country_population = 5, set_seed = 1)
+sim_SCO_stmomo_i <- simulate_country_population("SCO", size_relative_to_country_population = 3, set_seed = 1)
+sim_NIR_stmomo_i <- simulate_country_population("NIR", size_relative_to_country_population = 2, set_seed = 1)
+# set lower relative size due to small exposure
+
+# Add simulated ENW, SCO, and NIR dataset to the existing list
+stmomo_datasets$sim_ENW <- sim_ENW_stmomo_i
+stmomo_datasets$sim_SCO <- sim_SCO_stmomo_i
+stmomo_datasets$sim_NIR <- sim_NIR_stmomo_i
+```
+
+## Save Environment
+
+``` r
+save.image(file = "environment.RData")
+```
