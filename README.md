@@ -1,6 +1,6 @@
 # A Hierarchical Three-Population Mortality Model: An Extension of Two-Population Frameworks for Assessing Longevity Basis Risk
 
-This repository implements a hierarchical three-population mortality modelling framework using Human Mortality Database (HMD) data. The framework is used to estimate mortality dynamics, generate forecasts, and evaluate index-based longevity hedging strategies.
+This repository implements a hierarchical three-population mortality modelling framework using Human Mortality Database (HMD) data. The framework is designed for reproducible analysis of mortality dynamics, forecasting, and index-based longevity hedging. The five R Markdown files provide a modular workflow that allows users to flexibly modify populations, model specifications, and hedging assumptions to suit their own applications.
 
 ---
 
