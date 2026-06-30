@@ -62,16 +62,37 @@ This structure ensures later populations are informed by earlier reference popul
 
 ## Time-Series Modelling
 
-Estimated parameters are forecast using the following specifications:
+Estimated mortality parameters are forecast using the following time-series specifications.
 
 ### Period effects
-- **R1**: Random walk with drift (MRWD)
-- **R2 & B**: Vector autoregressive (VAR) model
+
+**R1 (MRWD model):**
+```math
+\kappa^{R1}_{t} = d + \kappa^{R1}_{t-1} + \epsilon_{t}
+```
+
+**R2 and Book Population (VAR model):**
+```math
+\boldsymbol{\kappa}^{i}_{t} = \mathbf{c} + \mathbf{A}\boldsymbol{\kappa}^{i}_{t-1} + \boldsymbol{\epsilon}^{i}_{t}, 
+\quad i \in \{R2, B\}
+```
+
+---
 
 ### Cohort effects
-- **R1**: ARIMA(1,1,0)
-- **R2 & B**: AR(1)
 
+**R1 (ARIMA(1,1,0)):**
+```math
+\gamma^{R1}_{t-x} - \gamma^{R1}_{t-x-1}
+=
+\phi_{0} + \phi_{1}\left(\gamma^{R1}_{t-x-1} - \gamma^{R1}_{t-x-2}\right) + \xi_{t}
+```
+
+**R2 and Book Population (AR(1)):**
+```math
+\gamma^{i}_{t-x} = \phi_{0} + \phi_{1}\gamma^{i}_{t-x-1} + \xi_{t}, 
+\quad i \in \{R2, B\}
+```
 ---
 
 ## Bootstrap Procedure
