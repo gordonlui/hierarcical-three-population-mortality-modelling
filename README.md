@@ -22,17 +22,17 @@ We consider the Cairns–Blake–Dowd (CBD) family of mortality models.
 
 ### M5
 ```math
-\logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} = \eta_{x,t}
+logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} = \eta_{x,t}
 ```
 
 ### M6
 ```math
-\logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} + \gamma_{t-x} = \eta_{x,t}
+logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} + \gamma_{t-x} = \eta_{x,t}
 ```
 
 ### M7
 ```math
-\logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} + \left((x - \bar{x})^2 - \sigma^2\right)\kappa_{t,3} + \gamma_{t-x} = \eta_{x,t}
+logit(q_{x,t}) = \kappa_{t,1} + (x - \bar{x})\kappa_{t,2} + \left((x - \bar{x})^2 - \sigma^2\right)\kappa_{t,3} + \gamma_{t-x} = \eta_{x,t}
 ```
 
 ---
@@ -43,17 +43,17 @@ The model is estimated sequentially across populations:
 
 ### R1
 ```math
-\logit(q^{R1}_{x,t}) = \eta^{R1}_{x,t}
+logit(q^{R1}_{x,t}) = \eta^{R1}_{x,t}
 ```
 
 ### R2
 ```math
-\logit(q^{R2}_{x,t}) - \logit(q^{R1}_{x,t}) = \eta^{R2}_{x,t}
+logit(q^{R2}_{x,t}) - logit(q^{R1}_{x,t}) = \eta^{R2}_{x,t}
 ```
 
 ### B
 ```math
-\logit(q^{B}_{x,t}) - \logit(q^{R2}_{x,t}) = \eta^{B}_{x,t}
+logit(q^{B}_{x,t}) - logit(q^{R2}_{x,t}) = \eta^{B}_{x,t}
 ```
 
 This structure ensures later populations are informed by earlier reference populations, improving estimation stability.
