@@ -1,0 +1,598 @@
+---
+title: "5 - Hedging"
+author: "Yiu Chung Lui (Gordon)"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prerequisite - Load Previous Environment
+```{r}
+load("environment.RData")
+```
+
+We evaluate index-based hedging instruments calibrated under the three-population mortality models. In particular, we construct a portfolio of index-based longevity swaps based on the two reference populations to hedge the book population’s mortality experience.
+
+Longevity risk reduction is defined as:
+
+```math
+\text{Longevity Risk Reduction} = \left(1 - \frac{\text{Hedged Risk}}{\text{Unhedged Risk}}\right)\times 100\%.
+```
+
+For each simulation \(i\), the present value of the hedged portfolio is:
+
+```math
+PV^{(i)} =
+\sum_{t=1}^{25} \frac{l^{B(i)}_{65+t,\,2020+t}}{(1+r)^t}
+- w_1 \sum_{t=1}^{25} \frac{\left({}_tp^{R1(i)}_{65,2020} - {}_tp^{R1,\text{forward}}_{65,2020}\right)}{(1+r)^t}
+- w_2 \sum_{t=1}^{25} \frac{\left({}_tp^{R2(i)}_{65,2020} - {}_tp^{R2,\text{forward}}_{65,2020}\right)}{(1+r)^t},
+\quad i = 1,\ldots,5000.
+```
+
+### M7 equation function ("M7_logit_qxt")
+```{r}
+# M7 Equation
+M7_logit_qxt <- function(kt, gc, age_range, year_range = NULL) {
+  # Exception test for year_range
+  if (is.null(year_range)) {
+      year_range <- colnames(kt)
+      if (is.null(year_range)) {
+          stop("Need to provide 'year_range' or colnames(kt).")
+      }
+  }
+
+  # Age terms
+  ages <- age_range
+  xbar <- mean(ages)
+  ages_c  <- ages - xbar
+  ages_c2 <- ages_c^2 - mean(ages_c^2)
+  
+  # Length of ages and years
+  length_x <- length(age_range)
+  length_t <- length(year_range)
+  
+  # Expand kt over ages (repeated rows)
+  kt1 <- matrix(kt[1, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+  kt2 <- matrix(kt[2, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+  kt3 <- matrix(kt[3, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+
+  # Expand age terms over years (repeated columns)
+  A1 <- matrix(ages_c,  nrow = length_x, ncol = length_t)
+  A2 <- matrix(ages_c2, nrow = length_x, ncol = length_t)
+  
+  # Cohort term
+  cohort_index <- outer(ages, as.numeric(year_range), function(x, t) t - x)
+  gc_years <- as.numeric(labels(gc)[[2]])
+  
+  gc_mat <- matrix(NA, nrow = length_x, ncol = length_t)
+  gc_mat[ , ] <- gc[match(cohort_index, gc_years)]
+  
+  # Calculate eta_xt
+  eta_xt <- kt1 + kt2*A1 + kt3*A2 + gc_mat # M7 equation
+  rownames(eta_xt) <- age_range
+  colnames(eta_xt) <- year_range
+  
+  return(eta_xt)
+}
+```
+
+### M6 equation function ("M6_logit_qxt")
+```{r}
+# M6 Equation
+M6_logit_qxt <- function(kt, gc, age_range, year_range = NULL) {
+  # Exception test for year_range
+  if (is.null(year_range)) {
+      year_range <- colnames(kt)
+      if (is.null(year_range)) {
+          stop("Need to provide 'year_range' or colnames(kt).")
+      }
+  }
+
+  # Age terms
+  ages <- age_range
+  xbar <- mean(ages)
+  ages_c  <- ages - xbar
+  
+  # Length of ages and years
+  length_x <- length(age_range)
+  length_t <- length(year_range)
+  
+  # Expand kt over ages (repeated rows)
+  kt1 <- matrix(kt[1, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+  kt2 <- matrix(kt[2, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+
+  # Expand age terms over years (repeated columns)
+  A1 <- matrix(ages_c,  nrow = length_x, ncol = length_t)
+  
+  # Cohort term
+  cohort_index <- outer(ages, as.numeric(year_range), function(x, t) t - x)
+  gc_years <- as.numeric(labels(gc)[[2]])
+  
+  gc_mat <- matrix(NA, nrow = length_x, ncol = length_t)
+  gc_mat[ , ] <- gc[match(cohort_index, gc_years)]
+  
+  # Calculate eta_xt
+  eta_xt <- kt1 + kt2*A1 + gc_mat # M6 equation
+  rownames(eta_xt) <- age_range
+  colnames(eta_xt) <- year_range
+  
+  return(eta_xt)
+}
+```
+
+### M5 equation function ("M5_logit_qxt")
+```{r}
+# M6 Equation
+M5_logit_qxt <- function(kt, age_range, year_range = NULL) {
+  # Exception test for year_range
+  if (is.null(year_range)) {
+      year_range <- colnames(kt)
+      if (is.null(year_range)) {
+          stop("Need to provide 'year_range' or colnames(kt).")
+      }
+  }
+
+  # Age terms
+  ages <- age_range
+  xbar <- mean(ages)
+  ages_c  <- ages - xbar
+  
+  # Length of ages and years
+  length_x <- length(age_range)
+  length_t <- length(year_range)
+  
+  # Expand kt over ages (repeated rows)
+  kt1 <- matrix(kt[1, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+  kt2 <- matrix(kt[2, ], nrow = length_x, ncol = length_t, byrow = TRUE)
+
+  # Expand age terms over years (repeated columns)
+  A1 <- matrix(ages_c,  nrow = length_x, ncol = length_t)
+  
+  # Calculate eta_xt
+  eta_xt <- kt1 + kt2*A1 # M5 equation
+  rownames(eta_xt) <- age_range
+  colnames(eta_xt) <- year_range
+  
+  return(eta_xt)
+}
+```
+
+### Pick the correct function for R1, R2 and B_3
+```{r}
+# Pick the correct function
+R1_logit_qxt <- 
+  if (identical(R1_model, M7)) {
+    M7_logit_qxt
+  } else if (identical(R1_model, M6)) {
+    M6_logit_qxt
+  } else if (identical(R1_model, M5)) {
+    M5_logit_qxt
+  } else {
+    stop("R1 Model specification not included/correct")
+  }
+
+R2_logit_qxt <- 
+  if (identical(R2_model, M7)) {
+    M7_logit_qxt
+  } else if (identical(R2_model, M6)) {
+    M6_logit_qxt
+  } else if (identical(R2_model, M5)) {
+    M5_logit_qxt
+  } else {
+    stop("R2 Model specification not included/correct")
+  }
+
+B_3_logit_qxt <- 
+  if (identical(B_3_model, M7)) {
+    M7_logit_qxt
+  } else if (identical(B_3_model, M6)) {
+    M6_logit_qxt
+  } else if (identical(B_3_model, M5)) {
+    M5_logit_qxt
+  } else {
+    stop("B_3 Model specification not included/correct")
+  }
+```
+
+### Calculate qxt for R1, R2 and B_3
+
+### Obtain mean logit qxt
+```{r}
+age_range <- 60:90
+
+# R1 logit qxt
+if (identical(R1_model, M5)) {
+  mean_R1_combined <- R1_logit_qxt(mean_kt_R1_combined, age_range = age_range)
+} else {
+  mean_R1_combined <- R1_logit_qxt(mean_kt_R1_combined, mean_gc_R1_combined, age_range = age_range)
+}
+
+# R2 logit qxt
+if (identical(R2_model, M5)) {
+  mean_R2_combined <- R2_logit_qxt(mean_kt_R2_combined, age_range = age_range) + mean_R1_combined
+} else {
+  mean_R2_combined <- R2_logit_qxt(mean_kt_R2_combined, mean_gc_R2_combined, age_range = age_range) + mean_R1_combined
+}
+
+# B_3 logit qxt
+if (identical(B_3_model, M5)) {
+  mean_B_3_combined <- B_3_logit_qxt(mean_kt_B_3_combined, age_range = age_range) + mean_R2_combined
+} else {
+  mean_B_3_combined <- B_3_logit_qxt(mean_kt_B_3_combined, mean_gc_B_3_combined, age_range = age_range) + mean_R2_combined
+}
+```
+
+### Obtain simulated logit qxt
+```{r}
+sim_R1_combined <- vector("list", nBoot)
+sim_R2_combined <- vector("list", nBoot)
+sim_B_3_combined <- vector("list", nBoot)
+
+for (i in 1:nBoot) {
+  # R1 logit qxt
+  if (identical(R1_model, M5)) {
+    sim_R1_combined[[i]] <- R1_logit_qxt(sim_kt_R1_combined[[i]], age_range = age_range)
+  } else {
+    sim_R1_combined[[i]] <- R1_logit_qxt(sim_kt_R1_combined[[i]], sim_gc_R1_combined[[i]], age_range = age_range)
+  }
+
+  # R2 logit qxt
+  if (identical(R2_model, M5)) {
+    sim_R2_combined[[i]] <- R2_logit_qxt(sim_kt_R2_combined[[i]], age_range = age_range) + sim_R1_combined[[i]]
+  } else {
+    sim_R2_combined[[i]] <- R2_logit_qxt(sim_kt_R2_combined[[i]], sim_gc_R2_combined[[i]], age_range = age_range) + sim_R1_combined[[i]]
+  }
+
+  # B_3 logit qxt
+  if (identical(B_3_model, M5)) {
+    sim_B_3_combined[[i]] <- B_3_logit_qxt(sim_kt_B_3_combined[[i]], age_range = age_range) + sim_R2_combined[[i]]
+  } else {
+    sim_B_3_combined[[i]] <- B_3_logit_qxt(sim_kt_B_3_combined[[i]], sim_gc_B_3_combined[[i]], age_range = age_range) + sim_R2_combined[[i]]
+  }
+}
+```
+
+### Transform to qxt
+```{r}
+# Transform using the inv_logit function
+
+# Mean qxt
+mean_R1_qxt <- inv_logit(mean_R1_combined)
+mean_R2_qxt <- inv_logit(mean_R2_combined)
+mean_B_3_qxt <- inv_logit(mean_B_3_combined)
+
+# Simulated qxt
+sim_R1_qxt <- vector("list", nBoot)
+sim_R2_qxt <- vector("list", nBoot)
+sim_B_3_qxt <- vector("list", nBoot)
+
+for (i in 1:nBoot) {
+  sim_R1_qxt[[i]] <- inv_logit(sim_R1_combined[[i]])
+  sim_R2_qxt[[i]] <- inv_logit(sim_R2_combined[[i]])
+  sim_B_3_qxt[[i]] <- inv_logit(sim_B_3_combined[[i]])
+}
+```
+
+### Calculate tpx (R1 and R2)
+
+### tpx function ("tpx_function")
+```{r}
+tpx_function <- function(qxt_data, duration, starting_age, starting_year) {
+  # Storing tpx
+  tpx <- numeric(duration)
+  names(tpx) <- paste0(1:duration, "p", starting_age)
+  
+  # Initializing tpx_dummy
+  tpx_dummy <- 1
+  
+  # Loop to calculate tpx  
+  for (t in 0:(duration - 1)) {
+    # Current age and year
+    age_x <- starting_age + t
+    year_t <- starting_year + t
+    
+    # Extract qxt
+    qxt <- qxt_data[as.character(age_x), as.character(year_t)]
+    
+    # Update survival probability
+    tpx_dummy <- tpx_dummy * (1 - qxt)
+    
+    # Store tpx value
+    tpx[t + 1] <- tpx_dummy
+  }
+  
+  return(tpx)
+}
+```
+
+### tPx forward (R1 and R2)
+```{r}
+tpx_R1_forward <- tpx_function(mean_R1_qxt, duration = 25, starting_age = 65, starting_year = 2020)
+tpx_R2_forward <- tpx_function(mean_R2_qxt, duration = 25, starting_age = 65, starting_year = 2020)
+```
+
+### tpx simulated (R1 and R2)
+```{r}
+tpx_R1_simulated <- vector("list", nBoot)
+tpx_R2_simulated <- vector("list", nBoot)
+
+for (i in 1:nBoot) {
+  tpx_R1_simulated[[i]] <- tpx_function(sim_R1_qxt[[i]], 
+                                        duration = 25, 
+                                        starting_age = 65, 
+                                        starting_year = 2020)
+  tpx_R2_simulated[[i]] <- tpx_function(sim_R2_qxt[[i]],
+                                        duration = 25, 
+                                        starting_age = 65, 
+                                        starting_year = 2020)
+}
+```
+
+### Calculate lx (B_3)
+
+### lx function ("lx_function")
+```{r}
+lx_function <- function(qxt_data, duration, starting_age, starting_year, initial_portfolio_size, random_state = 1) {
+  # Set seed
+  set.seed(random_state)
+  
+  # Storing lx
+  lx <- numeric(duration)
+  names(lx) <- paste0("l", starting_age + (1:duration))
+  
+  # Initialize lx_dummy
+  lx_dummy <- initial_portfolio_size
+  
+  # Loop to simulate lx
+  for (t in 0:(duration - 1)) {
+    # Current age and year
+    age_x <- starting_age + t
+    year_t <- starting_year + t
+    
+    # Extract qxt
+    qxt <- qxt_data[as.character(age_x), as.character(year_t)]
+    
+    # Simulate and Update lx
+    lx_dummy <- rbinom(n = 1, size = lx_dummy, prob = 1 - qxt)
+    
+    # Store tpx value
+    lx[t + 1] <- lx_dummy
+  }
+  
+  return(lx)
+}
+```
+
+### lx_function example
+```{r}
+lx_function(mean_B_3_qxt, duration = 25, starting_age = 65, starting_year = 2020, 
+            initial_portfolio_size = 30000, random_state = 1)
+```
+
+### Apply lx simulated on book
+```{r}
+lx_B_3_simulated <- vector("list", nBoot)
+
+for (i in 1:nBoot) {
+  lx_B_3_simulated[[i]] <- lx_function(sim_B_3_qxt[[i]], 
+                                       duration = 25, 
+                                       starting_age = 65, 
+                                       starting_year = 2020,
+                                       initial_portfolio_size = 30000,
+                                       random_state = i) # Need to set random_state = i, can't be a constant
+}
+```
+
+### Hedging Result (default is three-population)
+
+```{r}
+hedging_result <- function(lx_B, tpx_R1_f, tpx_R2_f, tpx_R1_sim, tpx_R2_sim, 
+                           interest_rate, two_ref = TRUE, ref_pop = NULL) {
+  # Defining parameters
+  r <- interest_rate
+  t <- seq(1, length(tpx_R1_f))
+  
+  # Set up matrix for A0, A1 and A2
+  A0 <- numeric(nBoot) # Unhedged liability
+  A1 <- numeric(nBoot) # R1 longevity swap
+  A2 <- numeric(nBoot) # R2 longevity swap
+  
+  # Loop for each simulation
+  for (i in 1:nBoot) {
+    # Inputs for hedging equation
+    A0[i] <- sum(lx_B[[i]]*(1 + r)^(-t))                    # Unhedged liability
+    A1[i] <- sum((tpx_R1_sim[[i]] - tpx_R1_f)*(1 + r)^(-t)) # R1 longevity swap
+    A2[i] <- sum((tpx_R2_sim[[i]] - tpx_R2_f)*(1 + r)^(-t)) # R2 longevity swap
+  }
+  
+  # Define VaR equation
+  VaR_demean <- function(payoff, p = 0.995) {
+    unname(quantile(payoff - mean(payoff), probs = p))
+  }
+  
+  # Define ES equation
+  ES_demean <- function(payoff, p = 0.995) {
+    # Demean payoff
+    x <- payoff - mean(payoff)
+  
+    # Compute VaR threshold
+    var_threshold <- unname(quantile(x, probs = p))
+  
+    # Compute Expected Shortfall Threshold
+    mean(x[x >= var_threshold])
+  }
+  
+  # Calculate unhedged var, sd, VaR and ES
+  unhedged_var <- var(A0)
+  unhedged_sd <- sqrt(unhedged_var)
+  unhedged_VaR <- VaR_demean(A0)
+  unhedged_ES <- ES_demean(A0)
+  
+  # Check if it uses two reference populations or one reference population
+  if (two_ref == FALSE) {
+    if (is.null(ref_pop) || !(ref_pop %in% c("R1","R2"))) {
+      stop("If two_ref = FALSE, ref_pop must be 'R1' or 'R2'.")
+    }
+  }
+  
+  # Define Hedging equation
+  hedging_eq <- function(w) {
+    # Two reference populations
+    if (two_ref) {
+      w1 <- w[1]
+      w2 <- w[2]
+    } else {
+      # One reference population
+      if (ref_pop == "R1") {
+        w1 <- w[1]
+        w2 <- 0
+      } else { # ref_pop == "R2"
+        w1 <- 0
+        w2 <- w[1]
+      }
+    }
+    
+    hedged_payoff <- A0 - w1*A1 - w2*A2
+    VaR_demean(hedged_payoff)
+  }
+  
+  # Initial guess
+  if (two_ref == TRUE) {
+    w0 <- c(0, 0)
+    } else {
+    w0 <- 0 # Only one hedging instrument to optimize
+  }
+  
+  # Run optimisation (unconstrained)
+  if (two_ref == TRUE) {
+    opt <- optim(
+      par = w0,
+      fn = hedging_eq,
+      method = "Nelder-Mead"
+    )
+#      method = "L-BFGS-B",
+#      lower = c(-Inf, -Inf),
+#      upper = c(Inf, Inf)
+  } else {
+    opt <- optim(
+      par = w0,
+      fn = hedging_eq,
+      method = "Brent",
+      lower = -max(A0)*5,
+      upper = max(A0)*5
+    )
+  }
+
+  
+  # Extract optimized weights
+  if (two_ref == TRUE) {
+    w1 <- opt$par[1]
+    w2 <- opt$par[2]
+  } else {
+    if (ref_pop == "R1") {
+      w1 <- opt$par[1]
+      w2 <- 0
+      } else {
+      w1 <- 0
+      w2 <- opt$par[1]
+    }
+  }
+  
+  # Calculate hedged var, sd, VaR, and ES
+  hedged_payoff <- A0 - w1*A1 - w2*A2
+  hedged_var <- var(hedged_payoff)
+  hedged_sd <- sqrt(hedged_var)
+  hedged_VaR <- VaR_demean(hedged_payoff)
+  hedged_ES <- ES_demean(hedged_payoff)
+  
+  # Calculate longevity risk reduction
+  var_risk_reduction <- round((1 - hedged_var/unhedged_var)*100, 3)
+  sd_risk_reduction <- round((1 - hedged_sd/unhedged_sd)*100, 3)
+  VaR_risk_reduction <- round((1 - hedged_VaR/unhedged_VaR)*100, 3)
+  ES_risk_reduction <- round((1 - hedged_ES/unhedged_ES)*100, 3)
+  
+  # Density plot
+  
+  # Combine x-range for both densities
+  x_range <- range(c(A0 - mean(A0), hedged_payoff - mean(hedged_payoff)))
+
+  # Compute density objects
+  d_unhedged <- density(A0 - mean(A0))
+  d_hedged <- density(hedged_payoff - mean(hedged_payoff))
+
+  # Determine max y-value for plot limits
+  max_height <- max(d_unhedged$y, d_hedged$y)
+
+  # Plot unhedged density
+  plot(d_unhedged,
+       xlim = x_range*1.5,
+       ylim = c(0, max_height*1.1),
+       col = "red",
+       lwd = 2,
+       main = "Unhedged vs Hedged De-meaned Payoff Density Plot",
+       xlab = "Payoff (demeaned)")
+
+  # Add hedged density
+  lines(d_hedged, col = "blue", lwd = 2)
+
+  # Add legend
+  legend("topright",
+        legend = c("Unhedged", "Hedged"),
+        col = c("red", "blue"),
+        lwd = 2,
+        bty = "n")
+  
+  # Return weights
+  weights <- matrix(c(w1, w2),
+                    nrow = 1,
+                    ncol = 2)
+  rownames(weights) <- "weights"
+  colnames(weights) <- c(paste0("w1 (", model_populations[1], ")"), 
+                         paste0("w2 (", model_populations[2], ")"))
+  
+  # Return hedging results
+  results <- matrix(c(unhedged_var, unhedged_sd, unhedged_VaR, unhedged_ES,
+                     hedged_var,   hedged_sd,   hedged_VaR,   hedged_ES,
+                     var_risk_reduction, sd_risk_reduction, VaR_risk_reduction, ES_risk_reduction),
+                    nrow = 4, 
+                    ncol = 3)
+  rownames(results) <- c("var", "sd", "VaR", "ES")
+  colnames(results) <- c("unhedged", "hedged", "risk reduction (in %)")
+  
+  # Return both weights and hedging results
+  return(list(
+    weights = weights,
+    results = results
+  ))
+}
+```
+
+### Evaluate hedging result
+```{r}
+two_ref_results <- hedging_result(lx_B_3_simulated, tpx_R1_forward, tpx_R2_forward,
+                           tpx_R1_simulated, tpx_R2_simulated, interest_rate = 0.01) # Also prints the plot
+print(two_ref_results$weights)
+cat("\n")
+print(two_ref_results$results)
+```
+```{r}
+R1_ref_results <- hedging_result(lx_B_3_simulated, tpx_R1_forward, tpx_R2_forward,
+                           tpx_R1_simulated, tpx_R2_simulated, interest_rate = 0.01,
+                           two_ref = FALSE, ref_pop = "R1") # Also prints the plot
+print(R1_ref_results$weights)
+cat("\n")
+print(R1_ref_results$results)
+```
+```{r}
+R2_ref_results <- hedging_result(lx_B_3_simulated, tpx_R1_forward, tpx_R2_forward,
+                           tpx_R1_simulated, tpx_R2_simulated, interest_rate = 0.01,
+                           two_ref = FALSE, ref_pop = "R2") # Also prints the plot
+print(R2_ref_results$weights)
+cat("\n")
+print(R2_ref_results$results)
+```
+
+
+
