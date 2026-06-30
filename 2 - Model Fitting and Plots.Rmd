@@ -8,7 +8,7 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Prerequisite - Load Previous Environemnt
+## Prerequisite - Load Previous Environment
 ```{r}
 load("environment.RData")
 ```
@@ -486,7 +486,7 @@ print(CBD_BIC)
 ```
 
 ## Save Environment
-```{r, eval = FALSE}
+```{r}
 save.image(file = "environment.RData")
 ```
 
