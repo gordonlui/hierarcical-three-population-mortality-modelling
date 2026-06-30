@@ -39,7 +39,7 @@ The project is implemented as a five-stage modular pipeline using R Markdown:
   Data extraction and preprocessing from the Human Mortality Database (HMD), including population selection and dataset construction.
 
 - `2 - Model Fitting and Plots.Rmd`  
-  Estimation of hierarchical three-population mortality models (CBD family: M5–M7) and visualisation of fitted results.
+  Estimation of hierarchical three-population mortality models (CBD family: M5, M6, M7) and visualisation of fitted results.
 
 - `3 - Time Series Model and Forecast.Rmd`  
   Time-series modelling of mortality parameters and generation of forecasted mortality rates.
