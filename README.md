@@ -2,7 +2,7 @@
 
 This repository implements a hierarchical three-population mortality modelling framework using Human Mortality Database (HMD) data. It provides a fully reproducible pipeline for estimating mortality dynamics, generating forecasts, and evaluating index-based longevity hedging strategies under model uncertainty.
 
-The workflow is organised into five modular R Markdown files, allowing users to flexibly modify populations, model specifications, and hedging assumptions.
+The workflow is organised into five modular R Markdown files, enabling users to adapt and extend the code to evaluate alternative populations, model specifications, and hedging strategies.
 
 ---
 
