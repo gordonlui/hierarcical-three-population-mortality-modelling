@@ -21,7 +21,7 @@ The hierarchical structure enables information sharing across populations, impro
 ## Key Features
 
 - Hierarchical three-population mortality modelling framework  
-- Cairns–Blake–Dowd (CBD) models (M5–M7)  
+- Cairns–Blake–Dowd (CBD) models (M5, M6, M7)  
 - Time-series forecasting of mortality parameters  
 - Residual bootstrap for uncertainty quantification  
 - Index-based longevity hedging framework  
