@@ -2,7 +2,7 @@
 ================
 Yiu Chung Lui (Gordon)
 
-## Prerequisite - Load Previous Environemnt
+## Prerequisite - Load Previous Environment
 
 ``` r
 load("environment.RData")
