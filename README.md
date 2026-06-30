@@ -25,7 +25,7 @@ The hierarchical structure enables information sharing across populations, impro
 - Time-series forecasting of mortality parameters  
 - Residual bootstrap for uncertainty quantification  
 - Index-based longevity hedging framework  
-- Simulation-based risk evaluation (5,000 replications)
+- Simulation-based longevity risk evaluation (5,000 replications)
 
 ---
 
