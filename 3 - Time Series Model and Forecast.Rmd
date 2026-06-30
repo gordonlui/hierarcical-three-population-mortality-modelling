@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Prerequisite - Load Previous Environment
-```{r, eval = FALSE}
+```{r}
 load("environment.RData")
 ```
 
@@ -538,7 +538,7 @@ roots(kt_B_3_fit)
 
 
 ## Save Environment
-```{r, eval = FALSE}
+```{r}
 save.image(file = "environment.RData")
 ```
 
